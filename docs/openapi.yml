@@ -1,0 +1,921 @@
+openapi: '3.0.3'
+info:
+  title: Fail2ban Distributed API
+  version: '1.0'
+servers:
+  - url: https://localhost:8080
+
+paths:
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Log in
+      description: Allows users to log in to the application.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  maxLength: 255
+                  type: string
+                  format: email
+                  example: example@example.com
+                password:
+                  maxLength: 255
+                  type: string
+                  example: 12345
+              required:
+                - email
+                - password
+      responses:
+        '204':
+          description: Successful login. JWT sent in a cookie.
+          headers: 
+            Set-Cookie:
+              schema: 
+                type: string
+                example: JWT=abcde12345; Path=/; HttpOnly
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register
+      description: Allows new users to create an account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: example@example.com
+                username:
+                  type: string
+                  example: user123
+              required:
+                - email
+                - username
+      responses:
+        '201':
+          description: Account created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Account created successfully."
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /auth/recovery:
+    post:
+      tags:
+        - Authentication
+      summary: Password Recovery
+      description: Initiates a password recovery process for a user by their email address.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:
+                  type: string
+                  format: email
+                  example: example@example.com
+      responses:
+        '204':
+          description: Password recovery email sent successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /auth/reset/{token}:
+    post:
+      tags:
+        - Authentication
+      summary: Password Reset
+      description: Allows a user to reset their password using a unique token.
+      security: []
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+            description: The unique token for password reset verification.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  example: "12345"
+                  description: The new password.
+                repassword:
+                  type: string
+                  example: "12345"
+                  description: The new password, repeated for confirmation.
+      responses:
+        '204':
+          description: Password has been reset successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users:
+    get:
+      tags:
+        - User Management
+      summary: List users with pagination
+      description: Retrieves a paginated list of users.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            description: Page number of the paginated results.
+        - in: query
+          name: pageSize
+          schema:
+            type: integer
+            default: 10
+            description: Number of items per page.
+      responses:
+        '200':
+          description: A paginated list of users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "12341rt2fg"
+                            username:
+                              type: string
+                              example: "demo"
+                            email:
+                              type: string
+                              format: email
+                              example: "example@example.com"
+    patch:
+      tags:
+        - User Management
+      summary: Update user information
+      description: Allows an authenticated user to update their username and email. This operation can only be performed by the user themselves.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  example: "demo"
+                email:
+                  type: string
+                  format: email
+                  example: "example@example.com"
+              required:
+                - username
+                - email
+      responses:
+        '200':
+          description: User information updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "uniqueUserId"
+                  username:
+                    type: string
+                    example: "demo"
+                  email:
+                    type: string
+                    format: email
+                    example: "example@example.com"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/password:
+    patch:
+      tags:
+        - User Management
+      summary: Update user password
+      description: Allows an authenticated user to update their password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                password:
+                  type: string
+                  format: password
+                  example: "12345"
+                repassword:
+                  type: string
+                  format: password
+                  example: "12345"
+              required:
+                - password
+                - repassword
+      responses:
+        '204':
+          description: Password updated successfully.
+        '400':
+          description: Invalid request format or data. Passwords do not match.
+        '401':
+          description: Unauthorized - The user is not authenticated.
+        '500':
+          description: Internal server error.
+
+  /users/{id}:
+    get:
+      tags:
+        - User Management
+      summary: Get User Information
+      description: Retrieves detailed information about a specific user.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the user.
+      responses:
+        '200':
+          description: Detailed information about the user.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "12341rt2fg"
+                  username:
+                    type: string
+                    example: "demo"
+                  email:
+                    type: string
+                    format: email
+                    example: "example@example.com"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - User Management
+      summary: Delete a User
+      description: Deletes a specific user from the system. This operation should be restricted to authorized users.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the user to be deleted.
+      responses:
+        '204':
+          description: No Content - The user was successfully deleted.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+ 
+  /token:
+    get:
+      tags:
+        - Token Management
+      summary: Generate Unique Token
+      description: Generates a unique token for the user.
+      responses:
+        '200':
+          description: A unique token was successfully generated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "9832h9823h9fn2p983fq3"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /tokens:
+    get:
+      tags:
+        - Token Management
+      summary: List Tokens with Pagination
+      description: Retrieves a list of tokens with pagination details.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+          description: The current page number.
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            default: 15
+          description: The number of items to return per page.
+      
+      responses:
+        '200':
+          description: A paginated list of tokens.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "asdf23"
+  /token/{id}:
+    get:
+      tags:
+        - Token Management
+      summary: Regenerate Token
+      description: Regenerates and returns a new token for the user, replacing the old one.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the token to be regenerated.
+      
+      responses:
+        '200':
+          description: A new token was successfully generated.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "new9832h9823h9fn2p983fq3"
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+
+    delete:
+      tags:
+        - Token Management
+      summary: Delete Token
+      description: Allows a user to delete or revoke their token.
+      parameters:
+        - in: path
+          name: tokenId
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the token to be deleted.
+      responses:
+        '204':
+          description: Token successfully deleted.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agents:
+    get:
+      tags:
+        - Agent Management
+      summary: List Agents with Pagination
+      description: Retrieves a list of agents with pagination details.
+      responses:
+        '200':
+          description: A paginated list of agents.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "1351234r1f"
+                            name:
+                              type: string
+                              example: "host13"
+                            block:
+                              type: integer
+                              example: 1234
+                            status:
+                              type: integer
+                              example: 1
+  /agents/{id}:
+    get:
+      tags:
+        - Agent Management
+      summary: Get agent details
+      description: Retrieves details of a specific agent by its ID.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the agent.
+      responses:
+        '200':
+          $ref: '#/components/responses/AgentDetalis'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agent/{id}:
+    patch:
+      tags:
+        - Agent Management
+      summary: Update Agent Details
+      description: Updates specific fields of an existing agent.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+          description: The unique identifier of the agent to be updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description:
+                  type: string
+                  example: "Smb repository"
+                list:
+                  type: array
+                  items:
+                    type: integer
+                  example: [1, 3, 5]
+      responses:
+        '200':
+          $ref: '#/components/responses/AgentDetalis'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /attacks/agents/{id}:
+    get:
+      tags:
+        - Attack Management
+      summary: List attacks received by a host
+      description: Retrieves a paginated list of attacks received by a specified host.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the host.
+      responses:
+        '200':
+          description: A paginated list of attacks received by the host.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "132t4ght"
+                            type:
+                              type: string
+                              example: "fail2ban"
+                            node_id:
+                              type: string
+                              example: "43gbom934"
+                            ip:
+                              type: string
+                              format: ipv4
+                              example: "80.74.35.22"
+                            status:
+                              type: boolean
+                              example: false
+                            first:
+                              type: string
+                              format: date-time
+                              example: "2017-02-11T14:55:08Z"
+                            last:
+                              type: string
+                              format: date-time
+                              example: "2017-02-15T14:22:08Z"
+                            count:
+                              type: integer
+                              example: 34
+  /attacks/ip/{ip}:
+    get:
+      tags:
+        - Attack Management
+      summary: List attacks from unique ip
+      description: Retrieves a paginated list of attacks received by a specified ip.
+      parameters:
+        - in: path
+          name: ip
+          required: true
+          schema:
+            type: string
+            description: The ip.
+      responses:
+        '200':
+          description: A paginated list from unique ip.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "132t4ght"
+                            type:
+                              type: string
+                              example: "fail2ban"
+                            node_id:
+                              type: string
+                              example: "43gbom934"
+                            ip:
+                              type: string
+                              format: ipv4
+                              example: "80.74.35.22"
+                            created_at:
+                              type: string
+                              format: date-time
+                              example: "2017-02-11T14:55:08Z"
+                            updated_at:
+                              type: string
+                              format: date-time
+                              example: "2017-02-15T14:22:08Z"
+                            deleted_at:
+                              type: string
+                              format: date-time
+                              example: "2017-02-15T14:22:08Z"
+                            count:
+                              type: integer
+                              example: 34
+  /attacks/{id}:
+    delete:
+      tags:
+        - Attack Management
+      summary: Delete attacks from a specific IP
+      description: Deletes all attacks received from a specified IP address.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the attacks to be deleted, or the IP address itself.
+      responses:
+        '204':
+          description: No Content - The attacks were successfully deleted.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /lists:
+    post:
+      tags:
+        - List Management
+      summary: Add a new IP to the list
+      description: Creates a new entry in the white or black list.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                CIDR:
+                  type: string
+                  example: "8.8.8.8"
+                type:
+                  type: string
+                  example: "blacklist"
+      responses:
+        '201':
+          description: Entry created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "1234r234f3"
+                  CIDR:
+                    type: string
+                    example: "8.8.8.8/32"
+                  type:
+                    type: string
+                    example: "blacklist"
+        '400':
+          description: Invalid input data.
+    get:
+      tags:
+        - List Management
+      summary: Get list entries
+      description: Retrieves entries from the white or black list.
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [blacklist, whitelist]
+          description: The type of list to retrieve.
+      responses:
+        '200':
+          description: A list of entries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                       type: array
+                       items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "1234r234f3"
+                            CIDR:
+                              type: string
+                              example: "8.8.8.8/32"
+                            type:
+                              type: string
+                              example: "blacklist"
+
+  /lists/{id}:
+    patch:
+      tags:
+        - List Management
+      summary: Update a list entry
+      description: Updates an existing entry in the white or black list.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the list entry to be updated.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                id:
+                  type: string
+                  example: "1234r234f3"
+                CIDR:
+                  type: string
+                  example: "8.8.4.4"
+                type:
+                  type: string
+                  example: "whitelist"
+      responses:
+        '200':
+          description: Entry updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    example: "1234r234f3"
+                  CIDR:
+                    type: string
+                    example: "8.8.8.8/32"
+                  type:
+                    type: string
+                    example: "blacklist"
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+    delete:
+      tags:
+        - List Management
+      summary: Delete a list entry
+      description: Deletes an entry from the white or black list.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the list entry to be deleted.
+      responses:
+        '204':
+          description: Entry deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+
+components:
+  responses:
+    NotFoundError:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    UnauthorizedError:
+      description: Invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    InternalServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    BadRequestError:
+      description: Bad request. Possible issues with the request content.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    AgentDetalis:
+      description: Details of the specific agent.
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              id:
+                type: string
+                example: "1234r234f3"
+              name:
+                type: string
+                example: "Host32"
+              description:
+                type: string
+                example: "Smb repository"
+              lists:
+                type: array
+                items:
+                  type: integer
+                example: [1,3,5]
+  schemas:
+    Pagination:
+      type: object
+      additionalProperties: false
+      properties:
+        total:
+          type: integer
+          example: 50
+        per_page:
+          type: integer
+          example: 15
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 4
+        from:
+          type: integer
+          example: 1
+        to:
+          type: integer
+          example: 15
+        data:
+          type: array
+          maxItems: 15
+          items: {}
+      required:
+        - total
+        - per_page
+        - current_page
+        - last_page
+        - from
+        - to
+        - data
+    Error:
+      type: object
+      properties:
+        message:
+          type: string
+          maxLength: 255
+          description: Detailed description of the error.
+          pattern: ^[A-Za-z0-9]$|^[\w\s\d\W\S\D]*$
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: jwt
+security:
+  - cookieAuth: []
+
