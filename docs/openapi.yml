@@ -1,0 +1,1367 @@
+openapi: '3.0.3'
+info:
+  title: Fail2ban Distributed API
+  version: '1.0'
+servers:
+  - url: https://localhost:8080
+
+paths:
+  /login:
+    post:
+      tags:
+        - Authentication
+      summary: Log in
+      description: Allows users to log in to the application.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              additionalProperties: false
+              type: object
+              properties:
+                email:
+                  maxLength: 255
+                  type: string
+                  format: email
+                  example: example@example.com
+                  pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+                password:
+                  maxLength: 255
+                  minLength: 8
+                  type: string
+                  example: Xyz@1234e3
+                  pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$
+              required:
+                - email
+                - password
+      responses:
+        '204':
+          description: Successful login. JWT sent in a cookie.
+          headers: 
+            Set-Cookie:
+              schema: 
+                type: string
+                example: JWT=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c; Path=/; HttpOnly
+                pattern: ^JWT=([A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+); Path=\/; HttpOnly$
+                maxLength: 1000
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /register:
+    post:
+      tags:
+        - Authentication
+      summary: Register
+      description: Allows new users to create an account.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                email:
+                  maxLength: 255
+                  type: string
+                  format: email
+                  example: example@example.com
+                  pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+                username:
+                  maxLength: 20
+                  type: string
+                  example: user123
+                  pattern: ^[a-zA-Z0-9_]$
+              required:
+                - email
+                - username
+      responses:
+        '201':
+          description: Account created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties : false
+                properties:
+                  message:
+                    type: string
+                    example: "Account created successfully."
+                    pattern: ^[\w\s\d\W\S\D]*$
+                    maxLength: 255
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /auth/recovery:
+    post:
+      tags:
+        - Authentication
+      summary: Password Recovery
+      description: Initiates a password recovery process for a user by their email address.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties : false
+              properties:
+                email:
+                  type: string
+                  maxLength: 255
+                  format: email
+                  example: example@example.com
+                  pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+      responses:
+        '204':
+          description: Password recovery email sent successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /auth/reset/{token}:
+    post:
+      tags:
+        - Authentication
+      summary: Password Reset
+      description: Allows a user to reset their password using a unique token.
+      security: []
+      parameters:
+        - in: path
+          name: token
+          required: true
+          schema:
+            type: string
+            description: The unique token for password reset verification.
+            example: "0cc376fa-0433-42f3-a600-6e04967cf955"
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                password:
+                  type: string
+                  example: Xyz@1234e3
+                  pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$
+                  description: The new password.
+                  maxLength: 255
+                repassword:
+                  type: string
+                  example: Xyz@1234e3
+                  pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$
+                  description: The new password, repeated for confirmation.
+                  maxLength: 255
+      responses:
+        '204':
+          description: Password has been reset successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users:
+    get:
+      tags:
+        - User Management
+      summary: List users with pagination
+      description: Retrieves a paginated list of users.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+            format: int32
+          description: The current page number.
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            format: int32
+            default: 15
+          description: The number of items to return per page.
+      responses:
+        '200':
+          description: A paginated list of users.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            id:
+                              type: string
+                              example: "fc4d7099-d938-43e3-b3d0-7bcdd59bcfe0"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            username:
+                              type: string
+                              example: "demo"
+                              maxLength: 255
+                              pattern: ^[\w\s\d\W\S\D]*$
+                            email:
+                              type: string
+                              format: email
+                              maxLength: 255
+                              example: "example@example.com"
+                              pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+                        maxItems: 15
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    patch:
+      tags:
+        - User Management
+      summary: Update user information
+      description: Allows an authenticated user to update their username and email. This operation can only be performed by the user themselves.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                username:
+                  type: string
+                  example: "demo"
+                  maxLength: 255
+                  pattern: ^[\w\s\d\W\S\D]*$
+                email:
+                  type: string
+                  format: email
+                  maxLength: 255
+                  example: "example@example.com"
+                  pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+              required:
+                - username
+                - email
+      responses:
+        '200':
+          description: User information updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  id:
+                    type: string
+                    example: "8388f31e-3060-4ff7-bb3e-b793153a1f25"
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                  username:
+                    type: string
+                    maxLength: 255
+                    example: "demo"
+                    pattern: ^[\w\s\d\W\S\D]*$
+                  email:
+                    type: string
+                    format: email
+                    maxLength: 255
+                    example: "example@example.com"
+                    pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /users/password:
+    patch:
+      tags:
+        - User Management
+      summary: Update user password
+      description: Allows an authenticated user to update their password.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                password:
+                  maxLength: 255
+                  minLength: 8
+                  type: string
+                  example: Xyz@1234e3
+                  pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$
+                repassword:
+                  maxLength: 255
+                  minLength: 8
+                  type: string
+                  example: Xyz@1234e3
+                  pattern: ^(?=.*[A-Za-z])(?=.*\d)(?=.*[@$!%*#?&])[A-Za-z\d@$!%*#?&]{8,}$
+              required:
+                - password
+                - repassword
+      responses:
+        '204':
+          description: Password updated successfully.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /users/{id}:
+    get:
+      tags:
+        - User Management
+      summary: Get User Information
+      description: Retrieves detailed information about a specific user.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the user.
+            example: "2465725e-425b-438f-a576-d2fc12dd5919"
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: Detailed information about the user.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  id:
+                    type: string
+                    example: "88b2e8fc-66c2-4c1d-ab3f-8b74c0e02f98"
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                  username:
+                    type: string
+                    example: "demo"
+                    maxLength: 255
+                    pattern: ^[\w\s\d\W\S\D]*$
+                  email:
+                    type: string
+                    format: email
+                    maxLength: 255
+                    example: "example@example.com"
+                    pattern: ^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - User Management
+      summary: Delete a User
+      description: Deletes a specific user from the system. This operation should be restricted to authorized users.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the user to be deleted.
+            example: c3aa1e3a-7f3f-46ed-aed3-c61b0217c883
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '204':
+          description: No Content - The user was successfully deleted.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+ 
+  /token:
+    get:
+      tags:
+        - Token Management
+      summary: Generate Unique Token
+      description: Generates a unique token for the user.
+      responses:
+        '200':
+          description: A unique token was successfully generated.
+          content:
+            application/json:
+              schema:
+                additionalProperties: false
+                type: object
+                properties:
+                  token:
+                    type: string
+                    example: "76a2099d-a476-45f9-867c-6207c5ee50a5"
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /tokens:
+    get:
+      tags:
+        - Token Management
+      summary: List Tokens with Pagination
+      description: Retrieves a list of tokens with pagination details.
+      parameters:
+        - in: query
+          name: page
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+            format: int32
+          description: The current page number.
+        - in: query
+          name: per_page
+          schema:
+            type: integer
+            maximum: 100
+            minimum: 1
+            format: int32
+            default: 15
+          description: The number of items to return per page.
+      
+      responses:
+        '200':
+          description: A paginated list of tokens.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          additionalProperties: false
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "9cd80f84-e439-43c7-9078-35c538c8273f"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                        maxItems: 15
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /token/{id}:
+    get:
+      tags:
+        - Token Management
+      summary: Regenerate Token
+      description: Regenerates and returns a new token for the user, replacing the old one.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            example: 3cc67700-7003-43ea-a4b7-171b244ad0fe
+          description: The unique identifier of the token to be regenerated.
+      
+      responses:
+        '200':
+          description: A new token was successfully generated.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  token:
+                    type: string
+                    example: "2bac6e0b-9062-4f6e-80a0-161d4e8105d3"
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - Token Management
+      summary: Delete Token
+      description: Allows a user to delete or revoke their token.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the token to be deleted.
+            example: 3cc67700-7003-43ea-a4b7-171b244ad0fe
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '204':
+          description: Token successfully deleted.
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agents:
+    get:
+      tags:
+        - Agent Management
+      summary: List Agents with Pagination
+      description: Retrieves a list of agents with pagination details.
+      responses:
+        '200':
+          description: A paginated list of agents.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            id:
+                              type: string
+                              example: "79692873-3016-48b4-9182-cc783b0179fd"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            name:
+                              maxLength: 255
+                              type: string
+                              example: "host13"
+                              pattern: ^[\w\s\d\W\S\D]*$
+                            block:
+                              type: integer
+                              example: 1234
+                            status:
+                              type: integer
+                              example: 1
+                        maxItems: 15
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agents/{id}:
+    get:
+      tags:
+        - Agent Management
+      summary: Get agent details
+      description: Retrieves details of a specific agent by its ID.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+            example: 56240606-15b4-4146-a9b8-6cbdf1a778c6
+          description: The unique identifier of the agent.
+      responses:
+        '200':
+          $ref: '#/components/responses/AgentDetalis'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /agent/{id}:
+    patch:
+      tags:
+        - Agent Management
+      summary: Update Agent Details
+      description: Updates specific fields of an existing agent.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the agent to be updated.
+            example: 56240606-15b4-4146-a9b8-6cbdf1a778c6
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                description:
+                  type: string
+                  example: "Smb repository"
+                  pattern: ^[\w\s\d\W\S\D]*$
+                  maxLength: 255
+                list:
+                  type: array
+                  items:
+                    type: string
+                    example: 5549ea5a-e81f-451f-9b3b-ff7e066e9fce
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                  maxItems: 100
+      responses:
+        '200':
+          $ref: '#/components/responses/AgentDetalis'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /attacks/agents/{id}:
+    get:
+      tags:
+        - Attack Management
+      summary: List attacks received by a host
+      description: Retrieves a paginated list of attacks received by a specified host.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the host.
+            example: "f0f91a2d-81bd-491a-8531-9e36d332cbf0"
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '200':
+          description: A paginated list of attacks received by the host.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            id:
+                              type: string
+                              example: "ab733030-e20d-4c58-9520-76debc1ad067"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            type:
+                              type: string
+                              example: "fail2ban"
+                              pattern: ^fail2ban$|^portsentry$
+                            node_id:
+                              type: string
+                              example: "f0f91a2d-81bd-491a-8531-9e36d332cbf0"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            ip:
+                              type: string
+                              format: ipv4
+                              example: "80.74.35.22/32"
+                              pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                            status:
+                              type: boolean
+                              example: false
+                            first:
+                              type: string
+                              format: date-time
+                              example: "2017-02-11T14:55:08Z"
+                              maxLength: 20
+                            last:
+                              type: string
+                              format: date-time
+                              example: "2017-02-15T14:22:08Z"
+                              maxLength: 20
+                            count:
+                              type: integer
+                              example: 34
+                        maxItems: 15
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /attacks/ip/{ip}:
+    get:
+      tags:
+        - Attack Management
+      summary: List attacks from unique ip
+      description: Retrieves a paginated list of attacks received by a specified ip.
+      parameters:
+        - in: path
+          name: ip
+          required: true
+          schema:
+            type: string
+            description: The ip.
+            example: "8.8.8.8/32"
+            pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+      responses:
+        '200':
+          description: A paginated list from unique ip.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                        type: array
+                        items:
+                          additionalProperties: false
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              example: "eb4c12a7-bdba-466d-a085-12e195f50fce"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            type:
+                              type: string
+                              example: "fail2ban"
+                              pattern: ^fail2ban$|^portsentry$
+                            node_id:
+                              type: string
+                              example: "3279eb6b-a9fb-472a-a0c4-b1f38602cf2b"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            ip:
+                              type: string
+                              format: ipv4
+                              example: "80.74.35.22"
+                              pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                            created_at:
+                              type: string
+                              format: date-time
+                              example: "2017-02-11T14:55:08Z"
+                              maxLength: 20
+                            updated_at:
+                              type: string
+                              format: date-time
+                              example: "2017-02-15T14:22:08Z"
+                              maxLength: 20
+                            deleted_at:
+                              type: string
+                              format: date-time
+                              example: "2017-02-15T14:22:08Z"
+                              maxLength: 20
+                            count:
+                              type: integer
+                              example: 34
+                        maxItems: 15
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /attacks/{id}:
+    delete:
+      tags:
+        - Attack Management
+      summary: Delete attacks from a specific IP
+      description: Deletes all attacks received from a specified IP address.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the attacks to be deleted, or the IP address itself.
+            example: "5d0d3c46-e1dc-4460-a1bb-60762215e392"
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '204':
+          description: No Content - The attacks were successfully deleted.
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+  /lists:
+    post:
+      tags:
+        - List Management
+      summary: Add a new IP to the list
+      description: Creates a new entry in the white or black list.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                CIDR:
+                  type: string
+                  example: "8.8.8.8"
+                  pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                type:
+                  type: string
+                  example: "blacklist"
+                  pattern: ^blacklist$|^whitelist$
+      responses:
+        '201':
+          description: Entry created successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  id:
+                    type: string
+                    example: "d980325a-83ba-475a-9451-6b66329b9e66"
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                  CIDR:
+                    type: string
+                    example: "8.8.8.8/32"
+                    pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                  type:
+                    type: string
+                    example: "blacklist"
+                    pattern: ^blacklist$|^whitelist$
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    get:
+      tags:
+        - List Management
+      summary: Get list entries
+      description: Retrieves entries from the white or black list.
+      parameters:
+        - in: query
+          name: type
+          required: true
+          schema:
+            type: string
+            enum: [blacklist, whitelist]
+          description: The type of list to retrieve.
+      responses:
+        '200':
+          description: A list of entries.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/Pagination'
+                  - type: object
+                    properties:
+                      data:
+                       type: array
+                       items:
+                          type: object
+                          additionalProperties: false
+                          properties:
+                            id:
+                              type: string
+                              example: "da97751a-c9b1-43ac-9c36-00d8f9a39e7e"
+                              pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                            CIDR:
+                              type: string
+                              example: "8.8.8.8/32"
+                              pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                            type:
+                              type: string
+                              example: "blacklist"
+                              pattern: ^blacklist$|^whitelist$
+                       maxItems: 15
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /lists/{id}:
+    patch:
+      tags:
+        - List Management
+      summary: Update a list entry
+      description: Updates an existing entry in the white or black list.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the list entry to be updated.
+            example: "5d0d3c46-e1dc-4460-a1bb-60762215e392"
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                id:
+                  type: string
+                  example: "15e0bb84-9f8a-4b83-92b5-84394b7fb81b"
+                  pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                CIDR:
+                  type: string
+                  example: "8.8.4.4"
+                  pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                type:
+                  type: string
+                  example: "whitelist"
+                  pattern: ^blacklist$|^whitelist$
+      responses:
+        '200':
+          description: Entry updated successfully.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  id:
+                    type: string
+                    example: "61575f89-f872-4c2a-9c91-b4a0b0eeccf4"
+                    pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+                  CIDR:
+                    type: string
+                    example: "8.8.8.8/32"
+                    pattern: ^([0-9]{1,3}\.){3}[0-9]{1,3}(\/([0-9]|[1-2][0-9]|3[0-2]))?$
+                  type:
+                    type: string
+                    example: "blacklist"
+                    pattern: ^blacklist$|^whitelist$
+        '400':
+          $ref: '#/components/responses/BadRequestError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    delete:
+      tags:
+        - List Management
+      summary: Delete a list entry
+      description: Deletes an entry from the white or black list.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+            description: The unique identifier of the list entry to be deleted.
+            example: "5d0d3c46-e1dc-4460-a1bb-60762215e392"
+            pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+      responses:
+        '204':
+          description: Entry deleted successfully.
+        '404':
+          $ref: '#/components/responses/NotFoundError'
+        '403':
+          $ref: '#/components/responses/ForbiddenError'
+        '401':
+          $ref: '#/components/responses/UnauthorizedError'
+        '406':
+          $ref: '#/components/responses/NotAcceptableError'
+        '415':
+          $ref: '#/components/responses/UnsupportedMediaType'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+components:
+  responses:
+    ForbiddenError:
+      description: The server understood the request, but is refusing to fulfill it.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            forbiddenExample:
+              value:
+                error: "Forbidden"
+                message: "You do not have permission to access this resource."
+    UnsupportedMediaType:
+      description: The server does not support the media type transmitted in the request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            unsupportedMediaTypeExample:
+              value:
+                error: "Unsupported Media Type"
+                message: "This media type is not supported."
+    TooManyRequests:
+      description: Too many requests have been made in a given amount of time.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            tooManyRequestsExample:
+              value:
+                error: "Too Many Requests"
+                message: "The request limit has been exceeded."
+    NotAcceptableError:
+      description: The requested resource is not available in the requested format.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            notAcceptableExample:
+              value:
+                error: "Not Acceptable"
+                message: "The requested resource is capable of generating only content not acceptable according to the Accept headers sent in the request."
+    NotFoundError:
+      description: The requested resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            notFoundExample:
+              value:
+                error: "Not Found"
+                message: "The specified resource does not exist."
+
+    UnauthorizedError:
+      description: Invalid credentials.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            unauthorizedExample:
+              value:
+                error: "Unauthorized"
+                message: "Credentials are invalid or missing."
+
+    InternalServerError:
+      description: Internal server error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            internalServerErrorExample:
+              value:
+                error: "Internal Server Error"
+                message: "An unexpected condition was encountered."
+
+    BadRequestError:
+      description: Bad request. Possible issues with the request content.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+          examples:
+            badRequestExample:
+              value:
+                error: "Bad Request"
+                message: "The request cannot be fulfilled due to bad syntax."
+    AgentDetalis:
+      description: Details of the specific agent.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            properties:
+              id:
+                type: string
+                example: "8460b7e1-51f3-405b-8452-e010116433c5"
+                pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$
+              name:
+                type: string
+                example: "Host32"
+                maxLength: 255
+                pattern: ^[\w\s\d\W\S\D]*$
+              description:
+                type: string
+                maxLength: 255
+                example: "Smb repository"
+                pattern: ^[\w\s\d\W\S\D]*$
+              lists:
+                type: array
+                items:
+                  type: integer
+                example: [1,3,5]
+                maxItems: 100
+  schemas:
+    Pagination:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 50
+        per_page:
+          type: integer
+          example: 15
+        current_page:
+          type: integer
+          example: 1
+        last_page:
+          type: integer
+          example: 4
+        from:
+          type: integer
+          example: 1
+        to:
+          type: integer
+          example: 15
+      required:
+        - total
+        - per_page
+        - current_page
+        - last_page
+        - from
+        - to
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: string
+          maxLength: 255
+          description: A brief description of the error.
+          pattern: ^[A-Za-z0-9]$|^[\w\s\d\W\S\D]*$
+        message:
+          type: string
+          maxLength: 255
+          description: Detailed description of the error.
+          pattern: ^[A-Za-z0-9]$|^[\w\s\d\W\S\D]*$
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: jwt
+security:
+  - cookieAuth: []
+
