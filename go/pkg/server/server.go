@@ -9,6 +9,7 @@ import (
 
 	"github.com/Gordians-of-Go/fail2banddist/pkg/response"
 
+	"github.com/gorilla/mux"
 	"github.com/gorilla/websocket"
 )
 
@@ -49,8 +50,13 @@ func (s *Server) NotifyClients(msg string) {
 	}
 }
 
+func addRoutes(r *mux.Router, s *Server) {
+	r.HandleFunc("/hello", s.HandleNewClient)
+}
+
 // NewServer creates a server with the given port
 func NewServer(port string) (*Server, error) {
+	r := mux.NewRouter()
 	p, err := strconv.Atoi(port)
 	if err != nil {
 		return nil, err
@@ -58,5 +64,6 @@ func NewServer(port string) (*Server, error) {
 	s := &Server{
 		Port: fmt.Sprintf("%d", p),
 	}
+	addRoutes(r, s)
 	return s, nil
 }
