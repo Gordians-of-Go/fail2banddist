@@ -1,0 +1,25 @@
+shape: sequence_diagram
+agent
+backend
+db
+login_flow: Login flow {
+  agent.login -> backend.validate: token
+  backend.validate.checktoken -> db.validate: is valid
+  db.validate -> backend.validate.checktoken: ok
+  backend.validate -> backend.validate.addNewAgent: add agent to active list
+  backend.validate -> agent.login: ok
+  backend.validate -> agent.login: ok
+}
+
+steady_state: Steady state {
+  backend.notify -> agent.listen_ws: ping
+  agent.listen_ws -> backend.notify: pong
+}
+
+new_attack: New attack {
+  agent -> backend.acceptAttack: New attack
+  backend.acceptAttack -> db.storeAttack: store attack
+  db.storeAttack -> backend.acceptAttack: ok
+  backend.acceptAttack -> agent: ACK
+  backend.acceptAttack.notify
+}
